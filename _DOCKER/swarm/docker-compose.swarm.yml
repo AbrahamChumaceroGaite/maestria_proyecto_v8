@@ -1,0 +1,202 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: wordpress-mysql:1.0.0
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    secrets:
+      - mysql_root_password
+      - mysql_password
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$(cat /run/secrets/mysql_root_password)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wordpress:
+    image: wordpress-app:1.0.0
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    secrets:
+      - mysql_password
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/nginx.conf
+      - source: php_config
+        target: /usr/local/etc/php/conf.d/custom.ini
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/mysql_password
+      WORDPRESS_TABLE_PREFIX: wp_
+    volumes:
+      - wordpress-data:/var/www/html
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+
+  phpmyadmin:
+    image: wordpress-phpmyadmin:1.0.0
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    secrets:
+      - mysql_password
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: wpuser
+      PMA_PASSWORD_FILE: /run/secrets/mysql_password
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "8080:80"
+
+  uptime-kuma:
+    image: wordpress-uptime:1.0.0
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    volumes:
+      - uptime-data:/app/data
+    networks:
+      - frontend
+    ports:
+      - "3001:3001"
+
+  mailhog:
+    image: wordpress-mailhog:1.0.0
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - backend
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  wp-cli:
+    image: wordpress-cli:1.0.0
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - node.role == manager
+    secrets:
+      - mysql_password
+      - wp_admin_password
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/mysql_password
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_URL: http://localhost
+      WORDPRESS_TITLE: WordPress Cluster Demo
+      WORDPRESS_ADMIN_USER: admin
+      WORDPRESS_ADMIN_PASSWORD_FILE: /run/secrets/wp_admin_password
+      WORDPRESS_ADMIN_EMAIL: admin@example.com
+    volumes:
+      - wordpress-data:/var/www/html
+      - type: bind
+        source: ../scripts
+        target: /scripts
+        read_only: true
+    networks:
+      - backend
+    entrypoint: ["/bin/bash", "/scripts/wp-init.sh"]
+
+networks:
+  frontend:
+    driver: overlay
+    attachable: true
+  backend:
+    driver: overlay
+
+volumes:
+  mysql-data:
+  wordpress-data:
+  uptime-data:
+
+secrets:
+  mysql_root_password:
+    external: true
+  mysql_password:
+    external: true
+  wp_admin_password:
+    external: true
+
+configs:
+  nginx_config:
+    file: ../services/wordpress/nginx.conf
+  php_config:
+    file: ../services/wordpress/php.ini
