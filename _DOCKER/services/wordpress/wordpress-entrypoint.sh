@@ -1,17 +1,14 @@
 #!/bin/bash
 set -e
 
-# Leer secret nativo de Docker
 if [ -f /run/secrets/mysql_password ]; then
     export WORDPRESS_DB_PASSWORD="$(cat /run/secrets/mysql_password)"
 else
-    # Modo Docker Compose
     WORDPRESS_DB_PASSWORD="${WORDPRESS_DB_PASSWORD:-changeme}"
 fi
 
-# Crear wp-config.php si no existe
 if [ ! -f /var/www/html/wp-config.php ]; then
-    echo "Creando wp-config.php..."
+    echo "Creating wp-config.php..."
     
     cat > /var/www/html/wp-config.php << EOF
 <?php
@@ -33,7 +30,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once ABSPATH . 'wp-settings.php';
 EOF
 
-    # Generar salts
     SALTS=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/ || echo "")
     if [ -n "$SALTS" ]; then
         sed -i "/DB_COLLATE/a\\${SALTS}" /var/www/html/wp-config.php
@@ -42,8 +38,7 @@ EOF
     chown www-data:www-data /var/www/html/wp-config.php
     chmod 640 /var/www/html/wp-config.php
     
-    echo "wp-config.php creado"
+    echo "wp-config.php created"
 fi
 
-# Iniciar servicios
 php-fpm -D && nginx -g 'daemon off;'

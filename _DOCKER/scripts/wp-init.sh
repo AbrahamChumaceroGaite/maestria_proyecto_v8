@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Leer secrets nativos de Docker
 if [ -f /run/secrets/mysql_password ]; then
     export WORDPRESS_DB_PASSWORD="$(cat /run/secrets/mysql_password)"
 else
@@ -14,13 +13,13 @@ else
     WORDPRESS_ADMIN_PASSWORD="${WORDPRESS_ADMIN_PASSWORD:-admin123}"
 fi
 
-echo "Esperando a que MySQL esté disponible..."
+echo "Waiting for MySQL..."
 sleep 30
 
 cd /var/www/html
 
 if [ ! -f wp-config.php ]; then
-    echo "Creando wp-config.php..."
+    echo "Creating wp-config.php..."
     
     wp config create \
         --dbname="${WORDPRESS_DB_NAME}" \
@@ -30,11 +29,11 @@ if [ ! -f wp-config.php ]; then
         --dbprefix="${WORDPRESS_TABLE_PREFIX}" \
         --allow-root
     
-    echo "wp-config.php creado"
+    echo "wp-config.php created"
 fi
 
 if ! wp core is-installed --allow-root 2>/dev/null; then
-    echo "Instalando WordPress..."
+    echo "Installing WordPress..."
     
     wp core install \
         --url="${WORDPRESS_URL}" \
@@ -45,20 +44,20 @@ if ! wp core is-installed --allow-root 2>/dev/null; then
         --skip-email \
         --allow-root
     
-    echo "Creando posts de prueba..."
+    echo "Creating test posts..."
     wp post create \
-        --post_title="Bienvenido al Cluster" \
-        --post_content="Este es un post de prueba creado automáticamente." \
+        --post_title="Welcome to Cluster" \
+        --post_content="Test post created automatically." \
         --post_status=publish \
         --allow-root || true
     
     wp post create \
-        --post_title="Arquitectura del Sistema" \
+        --post_title="System Architecture" \
         --post_content="WordPress + MySQL + phpMyAdmin + Uptime Kuma + MailHog" \
         --post_status=publish \
         --allow-root || true
     
-    echo "Creando usuarios de prueba..."
+    echo "Creating test users..."
     wp user create editor editor@example.com \
         --role=editor \
         --user_pass=editor123 \
@@ -69,7 +68,7 @@ if ! wp core is-installed --allow-root 2>/dev/null; then
         --user_pass=author123 \
         --allow-root || true
     
-    echo "Inicialización completada"
+    echo "Initialization completed"
 else
-    echo "WordPress ya está instalado"
+    echo "WordPress already installed"
 fi

@@ -1,60 +1,51 @@
 #!/bin/bash
 set -e
 
-echo "=== Despliegue WordPress en Docker Swarm ==="
+echo "=== WordPress Swarm Deployment ==="
 echo ""
 
-# Verificar Docker
 if ! docker info > /dev/null 2>&1; then
-    echo "Error: Docker no está corriendo"
+    echo "Error: Docker not running"
     exit 1
 fi
 
-# Paso 1: Inicializar Swarm
-echo "Paso 1/4: Inicializando Docker Swarm..."
+echo "Step 1/4: Initializing Docker Swarm..."
 SWARM_STATUS=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo "inactive")
 
 if [ "$SWARM_STATUS" = "active" ]; then
-    echo "Swarm ya está activo"
+    echo "Swarm already active"
     docker node ls
 else
-    echo "Inicializando Swarm..."
+    echo "Initializing Swarm..."
     docker swarm init 2>/dev/null || docker swarm init --advertise-addr $(hostname -I | awk '{print $1}')
-    echo "Swarm inicializado"
+    echo "Swarm initialized"
     docker node ls
 fi
 
 echo ""
+echo "Step 2/4: Creating secrets..."
 
-# Paso 2: Crear secrets
-echo "Paso 2/4: Creando secrets..."
-
-# Leer del .env en raíz
 if [ -f "../.env" ]; then
     source ../.env
-    echo "Leyendo credenciales de ../.env"
+    echo "Reading credentials from ../.env"
 else
-    echo "Error: No se encuentra ../.env"
+    echo "Error: ../.env not found"
     exit 1
 fi
 
-# Eliminar secrets existentes
 docker secret rm mysql_root_password 2>/dev/null || true
 docker secret rm mysql_password 2>/dev/null || true
 docker secret rm wp_admin_password 2>/dev/null || true
 
-# Crear secrets nativos
 echo "${MYSQL_ROOT_PASSWORD}" | docker secret create mysql_root_password -
 echo "${MYSQL_PASSWORD}" | docker secret create mysql_password -
 echo "${WORDPRESS_ADMIN_PASSWORD}" | docker secret create wp_admin_password -
 
-echo "Secrets creados:"
+echo "Secrets created:"
 docker secret ls
 
 echo ""
-
-# Paso 3: Verificar imágenes
-echo "Paso 3/4: Verificando imágenes..."
+echo "Step 3/4: Verifying images..."
 REQUIRED_IMAGES=(
     "wordpress-app:1.0.0"
     "wordpress-mysql:1.0.0"
@@ -72,22 +63,20 @@ for IMAGE in "${REQUIRED_IMAGES[@]}"; do
 done
 
 if [ ${#MISSING_IMAGES[@]} -ne 0 ]; then
-    echo "Error: Faltan imágenes:"
+    echo "Error: Missing images:"
     printf '%s\n' "${MISSING_IMAGES[@]}"
-    echo "Ejecuta: cd ../ && docker-compose build"
+    echo "Run: cd ../ && docker-compose build"
     exit 1
 fi
 
-echo "Imágenes OK"
+echo "Images OK"
 
 echo ""
-
-# Paso 4: Desplegar
-echo "Paso 4/4: Desplegando stack..."
+echo "Step 4/4: Deploying stack..."
 docker stack deploy -c docker-compose.swarm.yml wordpress
 
 echo ""
-echo "Esperando servicios..."
+echo "Waiting for services..."
 sleep 15
 
 echo ""
@@ -96,15 +85,15 @@ echo ""
 docker stack ps wordpress --no-trunc | head -20
 
 echo ""
-echo "=== Completado ==="
+echo "=== Deployment Complete ==="
 echo ""
-echo "Acceso:"
+echo "Access:"
 echo "  http://localhost          - WordPress"
 echo "  http://localhost:8080     - phpMyAdmin"
 echo "  http://localhost:3001     - Uptime Kuma"
 echo "  http://localhost:8025     - MailHog"
 echo ""
-echo "Comandos:"
+echo "Commands:"
 echo "  docker service logs wordpress_wordpress"
 echo "  docker service scale wordpress_wordpress=5"
 echo "  docker stack rm wordpress"
