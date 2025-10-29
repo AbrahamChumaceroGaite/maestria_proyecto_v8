@@ -4,54 +4,57 @@ set -e
 echo "=== Despliegue WordPress en Docker Swarm ==="
 echo ""
 
-# Verificar que Docker está corriendo
+# Verificar Docker
 if ! docker info > /dev/null 2>&1; then
     echo "Error: Docker no está corriendo"
     exit 1
 fi
 
 # Paso 1: Inicializar Swarm
-echo "Paso 1/5: Inicializando Docker Swarm..."
-SWARM_STATUS=$(docker info --format '{{.Swarm.LocalNodeState}}')
+echo "Paso 1/4: Inicializando Docker Swarm..."
+SWARM_STATUS=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo "inactive")
 
 if [ "$SWARM_STATUS" = "active" ]; then
     echo "Swarm ya está activo"
     docker node ls
 else
-    echo "Inicializando nuevo Swarm..."
-    docker swarm init
-    echo "Swarm inicializado correctamente"
+    echo "Inicializando Swarm..."
+    docker swarm init 2>/dev/null || docker swarm init --advertise-addr $(hostname -I | awk '{print $1}')
+    echo "Swarm inicializado"
     docker node ls
 fi
 
 echo ""
 
 # Paso 2: Crear secrets
-echo "Paso 2/5: Creando secrets..."
-echo "Ingrese password para MySQL root:"
-read -s MYSQL_ROOT_PASSWORD
-echo "Ingrese password para usuario wpuser:"
-read -s MYSQL_PASSWORD
-echo "Ingrese password para admin de WordPress:"
-read -s WP_ADMIN_PASSWORD
+echo "Paso 2/4: Creando secrets..."
 
-# Eliminar secrets existentes si existen
+# Leer del .env en raíz
+if [ -f "../.env" ]; then
+    source ../.env
+    echo "Leyendo credenciales de ../.env"
+else
+    echo "Error: No se encuentra ../.env"
+    exit 1
+fi
+
+# Eliminar secrets existentes
 docker secret rm mysql_root_password 2>/dev/null || true
 docker secret rm mysql_password 2>/dev/null || true
 docker secret rm wp_admin_password 2>/dev/null || true
 
-# Crear nuevos secrets
-echo "$MYSQL_ROOT_PASSWORD" | docker secret create mysql_root_password -
-echo "$MYSQL_PASSWORD" | docker secret create mysql_password -
-echo "$WP_ADMIN_PASSWORD" | docker secret create wp_admin_password -
+# Crear secrets nativos
+echo "${MYSQL_ROOT_PASSWORD}" | docker secret create mysql_root_password -
+echo "${MYSQL_PASSWORD}" | docker secret create mysql_password -
+echo "${WORDPRESS_ADMIN_PASSWORD}" | docker secret create wp_admin_password -
 
-echo "Secrets creados correctamente"
+echo "Secrets creados:"
 docker secret ls
 
 echo ""
 
 # Paso 3: Verificar imágenes
-echo "Paso 3/5: Verificando imágenes Docker..."
+echo "Paso 3/4: Verificando imágenes..."
 REQUIRED_IMAGES=(
     "wordpress-app:1.0.0"
     "wordpress-mysql:1.0.0"
@@ -69,45 +72,39 @@ for IMAGE in "${REQUIRED_IMAGES[@]}"; do
 done
 
 if [ ${#MISSING_IMAGES[@]} -ne 0 ]; then
-    echo "Error: Faltan las siguientes imágenes:"
+    echo "Error: Faltan imágenes:"
     printf '%s\n' "${MISSING_IMAGES[@]}"
-    echo ""
-    echo "Construya las imágenes primero con:"
-    echo "  docker-compose build"
+    echo "Ejecuta: cd ../ && docker-compose build"
     exit 1
 fi
 
-echo "Todas las imágenes están disponibles"
+echo "Imágenes OK"
 
 echo ""
 
-# Paso 4: Desplegar stack
-echo "Paso 4/5: Desplegando stack en Swarm..."
+# Paso 4: Desplegar
+echo "Paso 4/4: Desplegando stack..."
 docker stack deploy -c docker-compose.swarm.yml wordpress
 
 echo ""
-echo "Esperando a que los servicios inicien..."
+echo "Esperando servicios..."
 sleep 15
 
 echo ""
-
-# Paso 5: Verificar despliegue
-echo "Paso 5/5: Verificando despliegue..."
 docker stack services wordpress
 echo ""
-docker stack ps wordpress --no-trunc
+docker stack ps wordpress --no-trunc | head -20
 
 echo ""
-echo "=== Despliegue completado ==="
+echo "=== Completado ==="
 echo ""
-echo "Acceder a:"
-echo "  WordPress:   http://localhost"
-echo "  phpMyAdmin:  http://localhost:8080"
-echo "  Uptime Kuma: http://localhost:3001"
-echo "  MailHog:     http://localhost:8025"
+echo "Acceso:"
+echo "  http://localhost          - WordPress"
+echo "  http://localhost:8080     - phpMyAdmin"
+echo "  http://localhost:3001     - Uptime Kuma"
+echo "  http://localhost:8025     - MailHog"
 echo ""
-echo "Comandos útiles:"
-echo "  docker stack services wordpress    - Ver servicios"
-echo "  docker stack ps wordpress          - Ver tareas"
-echo "  docker service logs wordpress_wordpress  - Ver logs"
-echo "  docker stack rm wordpress          - Eliminar stack"
+echo "Comandos:"
+echo "  docker service logs wordpress_wordpress"
+echo "  docker service scale wordpress_wordpress=5"
+echo "  docker stack rm wordpress"

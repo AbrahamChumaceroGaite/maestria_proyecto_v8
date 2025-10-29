@@ -7,6 +7,9 @@ RUN mkdir -p /run/nginx /var/www/html
 
 COPY php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY wordpress-entrypoint.sh /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/wordpress-entrypoint.sh
 
 WORKDIR /var/www/html
 
@@ -24,4 +27,4 @@ RUN mkdir -p /var/www/html/wp-content/uploads && \
 
 EXPOSE 80
 
-CMD php-fpm -D && nginx -g 'daemon off;'
+ENTRYPOINT ["/usr/local/bin/wordpress-entrypoint.sh"]

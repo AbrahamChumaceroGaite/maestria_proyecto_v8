@@ -1,6 +1,19 @@
 #!/bin/bash
 set -e
 
+# Leer secrets nativos de Docker
+if [ -f /run/secrets/mysql_password ]; then
+    export WORDPRESS_DB_PASSWORD="$(cat /run/secrets/mysql_password)"
+else
+    WORDPRESS_DB_PASSWORD="${WORDPRESS_DB_PASSWORD:-changeme}"
+fi
+
+if [ -f /run/secrets/wp_admin_password ]; then
+    export WORDPRESS_ADMIN_PASSWORD="$(cat /run/secrets/wp_admin_password)"
+else
+    WORDPRESS_ADMIN_PASSWORD="${WORDPRESS_ADMIN_PASSWORD:-admin123}"
+fi
+
 echo "Esperando a que MySQL esté disponible..."
 sleep 30
 
@@ -17,7 +30,7 @@ if [ ! -f wp-config.php ]; then
         --dbprefix="${WORDPRESS_TABLE_PREFIX}" \
         --allow-root
     
-    echo "wp-config.php creado exitosamente"
+    echo "wp-config.php creado"
 fi
 
 if ! wp core is-installed --allow-root 2>/dev/null; then
@@ -37,26 +50,26 @@ if ! wp core is-installed --allow-root 2>/dev/null; then
         --post_title="Bienvenido al Cluster" \
         --post_content="Este es un post de prueba creado automáticamente." \
         --post_status=publish \
-        --allow-root
+        --allow-root || true
     
     wp post create \
         --post_title="Arquitectura del Sistema" \
         --post_content="WordPress + MySQL + phpMyAdmin + Uptime Kuma + MailHog" \
         --post_status=publish \
-        --allow-root
+        --allow-root || true
     
     echo "Creando usuarios de prueba..."
     wp user create editor editor@example.com \
         --role=editor \
         --user_pass=editor123 \
-        --allow-root
+        --allow-root || true
     
     wp user create author author@example.com \
         --role=author \
         --user_pass=author123 \
-        --allow-root
+        --allow-root || true
     
-    echo "Seeds completados exitosamente"
+    echo "Inicialización completada"
 else
     echo "WordPress ya está instalado"
 fi
