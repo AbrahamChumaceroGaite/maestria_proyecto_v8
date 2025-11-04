@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: wordpress
+data:
+  nginx.conf: |
+    user www-data;
+    worker_processes auto;
+    pid /run/nginx.pid;
+    events {
+      worker_connections 1024;
+    }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      sendfile on;
+      keepalive_timeout 65;
+      client_max_body_size 64M;
+      server {
+        listen 80;
+        server_name _;
+        root /var/www/html;
+        index index.php index.html;
+        location / {
+          try_files $uri $uri/ /index.php?$args;
+        }
+        location ~ \.php$ {
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          fastcgi_pass 127.0.0.1:9000;
+          fastcgi_index index.php;
+          include fastcgi_params;
+          fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          fastcgi_param PATH_INFO $fastcgi_path_info;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: php-config
+  namespace: wordpress
+data:
+  custom.ini: |
+    upload_max_filesize = 64M
+    post_max_size = 64M
+    max_execution_time = 300
+    max_input_time = 300
+    memory_limit = 256M
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+  namespace: wordpress
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS wordpress;
+    GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'%';
+    FLUSH PRIVILEGES;
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wp-init-script
+  namespace: wordpress
+data:
+  wp-init.sh: |
+    #!/bin/bash
+    set -e
+    cd /var/www/html
+    if ! wp core is-installed --allow-root 2>/dev/null; then
+      wp core install \
+        --url="${WORDPRESS_URL}" \
+        --title="${WORDPRESS_TITLE}" \
+        --admin_user="${WORDPRESS_ADMIN_USER}" \
+        --admin_password="${WORDPRESS_ADMIN_PASSWORD}" \
+        --admin_email="${WORDPRESS_ADMIN_EMAIL}" \
+        --allow-root
+    fi
+

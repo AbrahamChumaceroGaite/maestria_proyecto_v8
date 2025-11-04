@@ -1,74 +1,68 @@
 #!/bin/bash
 set -e
 
-if [ -f /run/secrets/mysql_password ]; then
-    export WORDPRESS_DB_PASSWORD="$(cat /run/secrets/mysql_password)"
-else
-    WORDPRESS_DB_PASSWORD="${WORDPRESS_DB_PASSWORD:-changeme}"
+if [ -f /run/secrets/app.env ]; then
+    export $(grep -v '^#' /run/secrets/app.env | xargs)
+    export WORDPRESS_DB_PASSWORD="${MYSQL_PASSWORD}"
+    export WORDPRESS_ADMIN_PASSWORD="${WORDPRESS_ADMIN_PASSWORD}"
 fi
 
-if [ -f /run/secrets/wp_admin_password ]; then
-    export WORDPRESS_ADMIN_PASSWORD="$(cat /run/secrets/wp_admin_password)"
-else
-    WORDPRESS_ADMIN_PASSWORD="${WORDPRESS_ADMIN_PASSWORD:-admin123}"
-fi
-
-echo "Waiting for MySQL..."
+echo "Esperando a que MySQL esté disponible..."
 sleep 30
 
 cd /var/www/html
 
 if [ ! -f wp-config.php ]; then
-    echo "Creating wp-config.php..."
+    echo "Creando wp-config.php..."
     
     wp config create \
-        --dbname="${WORDPRESS_DB_NAME}" \
-        --dbuser="${WORDPRESS_DB_USER}" \
+        --dbname="wordpress" \
+        --dbuser="wpuser" \
         --dbpass="${WORDPRESS_DB_PASSWORD}" \
-        --dbhost="${WORDPRESS_DB_HOST}" \
-        --dbprefix="${WORDPRESS_TABLE_PREFIX}" \
+        --dbhost="mysql:3306" \
+        --dbprefix="wp_" \
         --allow-root
     
-    echo "wp-config.php created"
+    echo "wp-config.php creado exitosamente"
 fi
 
 if ! wp core is-installed --allow-root 2>/dev/null; then
-    echo "Installing WordPress..."
+    echo "Instalando WordPress..."
     
     wp core install \
-        --url="${WORDPRESS_URL}" \
-        --title="${WORDPRESS_TITLE}" \
-        --admin_user="${WORDPRESS_ADMIN_USER}" \
+        --url="http://localhost" \
+        --title="WordPress Cluster Demo" \
+        --admin_user="admin" \
         --admin_password="${WORDPRESS_ADMIN_PASSWORD}" \
-        --admin_email="${WORDPRESS_ADMIN_EMAIL}" \
+        --admin_email="admin@example.com" \
         --skip-email \
         --allow-root
     
-    echo "Creating test posts..."
+    echo "Creando posts de prueba..."
     wp post create \
-        --post_title="Welcome to Cluster" \
-        --post_content="Test post created automatically." \
+        --post_title="Bienvenido al Cluster" \
+        --post_content="Este es un post de prueba creado automáticamente." \
         --post_status=publish \
-        --allow-root || true
+        --allow-root
     
     wp post create \
-        --post_title="System Architecture" \
+        --post_title="Arquitectura del Sistema" \
         --post_content="WordPress + MySQL + phpMyAdmin + Uptime Kuma + MailHog" \
         --post_status=publish \
-        --allow-root || true
+        --allow-root
     
-    echo "Creating test users..."
+    echo "Creando usuarios de prueba..."
     wp user create editor editor@example.com \
         --role=editor \
         --user_pass=editor123 \
-        --allow-root || true
+        --allow-root
     
     wp user create author author@example.com \
         --role=author \
         --user_pass=author123 \
-        --allow-root || true
+        --allow-root
     
-    echo "Initialization completed"
+    echo "Seeds completados exitosamente"
 else
-    echo "WordPress already installed"
+    echo "WordPress ya está instalado"
 fi

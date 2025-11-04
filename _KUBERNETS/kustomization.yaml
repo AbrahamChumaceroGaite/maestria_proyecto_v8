@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: wordpress
+
+resources:
+  - manifests/00-namespace.yaml
+  - manifests/01-secrets.yaml
+  - manifests/02-configmaps.yaml
+  - manifests/03-storage.yaml
+  - manifests/04-mysql.yaml
+  - manifests/05-wordpress.yaml
+  - manifests/06-phpmyadmin.yaml
+  - manifests/07-uptime-kuma.yaml
+  - manifests/08-mailhog.yaml
+  - manifests/09-wp-cli-job.yaml
+  - manifests/10-ingress.yaml
+  - manifests/11-hpa.yaml
+  - manifests/12-networkpolicy.yaml
+  - manifests/13-resourcequota.yaml
+  - manifests/14-poddisruptionbudget.yaml
+  - manifests/15-servicemonitor.yaml
+
+commonLabels:
+  project: wordpress
+  environment: development
+
+images:
+  - name: wordpress-mysql
+    newTag: 1.0.0
+  - name: wordpress-app
+    newTag: 1.0.0
+  - name: wordpress-phpmyadmin
+    newTag: 1.0.0
+  - name: wordpress-uptime
+    newTag: 1.0.0
+  - name: wordpress-mailhog
+    newTag: 1.0.0
+  - name: wordpress-cli
+    newTag: 1.0.0
+

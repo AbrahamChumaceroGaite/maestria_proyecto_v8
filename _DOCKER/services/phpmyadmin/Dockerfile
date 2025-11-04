@@ -1,9 +1,9 @@
 FROM phpmyadmin:5-apache
 
-COPY phpmyadmin-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/phpmyadmin-entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80
 
-ENTRYPOINT ["/usr/local/bin/phpmyadmin-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["apache2-foreground"]

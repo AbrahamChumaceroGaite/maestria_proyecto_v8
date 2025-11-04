@@ -1,0 +1,57 @@
+name: Kubernetes Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Validate manifests
+      run: |
+        cd _KUBERNETS
+        for file in manifests/*.yaml; do
+          kubectl apply --dry-run=client -f "$file"
+        done
+    
+    - name: Install k3d
+      run: |
+        curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+    
+    - name: Create cluster
+      run: |
+        cd _KUBERNETS/scripts
+        chmod +x *.sh
+        ./create-cluster.sh
+    
+    - name: Build images
+      run: |
+        cd _KUBERNETS/scripts
+        ./build-images.sh
+    
+    - name: Deploy
+      run: |
+        cd _KUBERNETS/scripts
+        ./deploy.sh
+    
+    - name: Check status
+      run: |
+        kubectl get pods -n wordpress
+        kubectl get svc -n wordpress
+    
+    - name: Delete cluster
+      if: always()
+      run: |
+        cd _KUBERNETS/scripts
+        ./delete-cluster.sh
+

@@ -1,0 +1,107 @@
+namespace: wordpress
+
+mysql:
+  image: wordpress-mysql:1.0.0
+  replicas: 1
+  storage: 5Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  rootPassword: changeme_root_password
+  database: wordpress
+  user: wpuser
+  password: changeme_user_password
+
+wordpress:
+  image: wordpress-app:1.0.0
+  replicas: 3
+  storage: 10Gi
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  url: http://localhost
+  title: WordPress K3D
+  adminUser: admin
+  adminPassword: admin123
+  adminEmail: admin@example.com
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    cpuUtilization: 70
+    memoryUtilization: 80
+
+phpmyadmin:
+  image: wordpress-phpmyadmin:1.0.0
+  replicas: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    cpuUtilization: 70
+
+uptimeKuma:
+  image: wordpress-uptime:1.0.0
+  replicas: 1
+  storage: 1Gi
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+mailhog:
+  image: wordpress-mailhog:1.0.0
+  replicas: 1
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
+
+wpCli:
+  image: wordpress-cli:1.0.0
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    wordpress: wordpress.local
+    phpmyadmin: phpmyadmin.local
+    uptime: uptime.local
+    mail: mail.local
+
+storageClass: local-storage
+
+networkPolicy:
+  enabled: true
+
+resourceQuota:
+  enabled: true
+  cpu: "10"
+  memory: 20Gi
+  pods: "50"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+

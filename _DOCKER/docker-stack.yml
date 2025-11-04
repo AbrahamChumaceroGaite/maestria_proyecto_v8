@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mysql:
-    image: wordpress-mysql:1.0.0
+    image: ${DOCKER_USERNAME}/wordpress-mysql:${IMAGE_TAG}
     deploy:
       replicas: 1
       placement:
@@ -19,11 +19,9 @@ services:
           cpus: '0.5'
           memory: 512M
     secrets:
-      - mysql_root_password
-      - mysql_password
+      - source: credentials
+        target: /run/secrets/app.env
     environment:
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
-      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
       MYSQL_DATABASE: wordpress
       MYSQL_USER: wpuser
     volumes:
@@ -31,13 +29,18 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p$$(cat /run/secrets/mysql_root_password)"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pchangeme_root_password"]
       interval: 10s
       timeout: 5s
       retries: 5
+    entrypoint: >
+      bash -c '
+      export $$(grep -v "^#" /run/secrets/app.env | xargs);
+      /usr/local/bin/docker-entrypoint.sh mysqld
+      '
 
   wordpress:
-    image: wordpress-app:1.0.0
+    image: ${DOCKER_USERNAME}/wordpress-app:${IMAGE_TAG}
     deploy:
       replicas: 3
       update_config:
@@ -60,17 +63,13 @@ services:
           cpus: '0.25'
           memory: 256M
     secrets:
-      - mysql_password
+      - source: credentials
+        target: /run/secrets/app.env
     configs:
       - source: nginx_config
         target: /etc/nginx/nginx.conf
       - source: php_config
         target: /usr/local/etc/php/conf.d/custom.ini
-    environment:
-      WORDPRESS_DB_HOST: mysql:3306
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wpuser
-      WORDPRESS_TABLE_PREFIX: wp_
     volumes:
       - wordpress-data:/var/www/html
     networks:
@@ -80,7 +79,7 @@ services:
       - "80:80"
 
   phpmyadmin:
-    image: wordpress-phpmyadmin:1.0.0
+    image: ${DOCKER_USERNAME}/wordpress-phpmyadmin:${IMAGE_TAG}
     deploy:
       replicas: 2
       update_config:
@@ -94,7 +93,8 @@ services:
           cpus: '0.25'
           memory: 256M
     secrets:
-      - mysql_password
+      - source: credentials
+        target: /run/secrets/app.env
     environment:
       PMA_HOST: mysql
       PMA_PORT: 3306
@@ -106,7 +106,7 @@ services:
       - "8080:80"
 
   uptime-kuma:
-    image: wordpress-uptime:1.0.0
+    image: ${DOCKER_USERNAME}/wordpress-uptime:${IMAGE_TAG}
     deploy:
       replicas: 1
       placement:
@@ -124,7 +124,7 @@ services:
       - "3001:3001"
 
   mailhog:
-    image: wordpress-mailhog:1.0.0
+    image: ${DOCKER_USERNAME}/wordpress-mailhog:${IMAGE_TAG}
     deploy:
       replicas: 1
       placement:
@@ -141,7 +141,7 @@ services:
       - "8025:8025"
 
   wp-cli:
-    image: wordpress-cli:1.0.0
+    image: ${DOCKER_USERNAME}/wordpress-cli:${IMAGE_TAG}
     deploy:
       replicas: 1
       restart_policy:
@@ -150,21 +150,12 @@ services:
         constraints:
           - node.role == manager
     secrets:
-      - mysql_password
-      - wp_admin_password
-    environment:
-      WORDPRESS_DB_HOST: mysql:3306
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wpuser
-      WORDPRESS_TABLE_PREFIX: wp_
-      WORDPRESS_URL: http://localhost
-      WORDPRESS_TITLE: WordPress Cluster Demo
-      WORDPRESS_ADMIN_USER: admin
-      WORDPRESS_ADMIN_EMAIL: admin@example.com
+      - source: credentials
+        target: /run/secrets/app.env
     volumes:
       - wordpress-data:/var/www/html
       - type: bind
-        source: ../scripts
+        source: ./scripts
         target: /scripts
         read_only: true
     networks:
@@ -187,15 +178,12 @@ volumes:
     driver: local
 
 secrets:
-  mysql_root_password:
-    external: true
-  mysql_password:
-    external: true
-  wp_admin_password:
-    external: true
+  credentials:
+    file: ./secrets.env
 
 configs:
   nginx_config:
-    file: ../services/wordpress/nginx.conf
+    file: ./services/wordpress/nginx.conf
   php_config:
-    file: ../services/wordpress/php.ini
+    file: ./services/wordpress/php.ini
+

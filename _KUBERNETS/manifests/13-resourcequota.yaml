@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: wordpress-quota
+  namespace: wordpress
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    services.loadbalancers: "5"
+    pods: "50"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: wordpress-limits
+  namespace: wordpress
+spec:
+  limits:
+  - max:
+      cpu: "2"
+      memory: 2Gi
+    min:
+      cpu: 50m
+      memory: 64Mi
+    default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 250m
+      memory: 256Mi
+    type: Container
+  - max:
+      storage: 20Gi
+    min:
+      storage: 1Gi
+    type: PersistentVolumeClaim
+
