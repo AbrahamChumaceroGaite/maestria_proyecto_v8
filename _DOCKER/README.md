@@ -135,11 +135,3 @@ Configs
 
 nginx_config: configuración Nginx
 php_config: configuración PHP
-
-Despliegue en servidor remoto
-
-En servidor instalar Docker
-Iniciar Swarm: docker swarm init
-Crear secrets.env
-Exportar variables: export DOCKER_USERNAME=usuario IMAGE_TAG=1.0.0 STACK_NAME=wordpress
-Desplegar: docker stack deploy -c docker-stack.yml wordpress
